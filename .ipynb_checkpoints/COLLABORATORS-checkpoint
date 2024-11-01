@@ -1,0 +1,7 @@
+Stack Exchange Community, https://datascience.stackexchange.com/questions/100120/phone-number-tagging-with-spacy, Consulted for insights on tagging phone numbers using SpaCy.
+SpaCy Documentation, https://spacy.io/usage/rule-based-matching, Used as a reference for implementing rule-based matching with SpaCy.
+Hugging Face, https://huggingface.co/docs, Consulted for understanding and using BERT-based NER model for enhanced entity recognition.
+NLTK Documentation, https://www.nltk.org, Referenced for using WordNet to expand concept synonyms.
+Abhiyan Ampally, https://medium.com/@abhiyanampally/ner-location-detection-using-spacy-a-step-by-step-guide-194c7c6a3d7e, Referenced for guidance on location detection using SpaCy NER.
+
+
