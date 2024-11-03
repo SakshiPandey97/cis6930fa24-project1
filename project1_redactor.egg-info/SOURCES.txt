@@ -1,0 +1,15 @@
+LICENSE
+README.md
+pyproject.toml
+setup.py
+project1_redactor.egg-info/PKG-INFO
+project1_redactor.egg-info/SOURCES.txt
+project1_redactor.egg-info/dependency_links.txt
+project1_redactor.egg-info/entry_points.txt
+project1_redactor.egg-info/requires.txt
+project1_redactor.egg-info/top_level.txt
+tests/test_address.py
+tests/test_concept.py
+tests/test_dates.py
+tests/test_names.py
+tests/test_phone.py

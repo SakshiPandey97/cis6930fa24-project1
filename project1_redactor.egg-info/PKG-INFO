@@ -1,0 +1,12 @@
+Metadata-Version: 2.1
+Name: project1_redactor
+Version: 1.0
+Author: Sakshi Pandey
+Author-email: sakshi.pandey@ufl.edu
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.10
+License-File: LICENSE
+Requires-Dist: nltk
+Requires-Dist: spacy
+Requires-Dist: transformers
