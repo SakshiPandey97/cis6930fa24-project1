@@ -12,7 +12,6 @@ import spacy
 from spacy.matcher import Matcher
 from transformers import pipeline
 
-
 nltk.download('punkt', quiet=True)
 nltk.download('wordnet', quiet=True)
 nltk.download('omw-1.4', quiet=True)
@@ -243,12 +242,14 @@ def main():
     try:
         nlp_trf = spacy.load('en_core_web_trf')
     except OSError:
+        print("Downloading and installing 'en_core_web_trf' model...")
         spacy.cli.download('en_core_web_trf')
         nlp_trf = spacy.load('en_core_web_trf')
 
     try:
         nlp_sm = spacy.load("en_core_web_sm")
     except OSError:
+        print("Downloading and installing 'en_core_web_sm' model...")
         spacy.cli.download("en_core_web_sm")
         nlp_sm = spacy.load("en_core_web_sm")
 
