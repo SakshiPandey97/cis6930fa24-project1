@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "05fac8e82a30da39d3df00a59502a808db2d5367f427e48c55cde7905da6dcd1"
+            "sha256": "29c4403b49b4f368f829f63f9c344fe58b741480d3f4f5be8cb45c141a757f4e"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -14,7 +14,7 @@
             "en_core_web_trf": {
                 "file": "https://github.com/explosion/spacy-models/releases/download/en_core_web_trf-3.5.0/en_core_web_trf-3.5.0-py3-none-any.whl"
             },
-            "python_version": "3.10"
+            "python_version": "3.12"
         },
         "sources": [
             {
