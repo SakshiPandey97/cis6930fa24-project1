@@ -239,7 +239,7 @@ def main():
     args = parser.parse_args()
 
     stats_type = args.stats.lower() if args.stats and args.stats.lower() in ['stderr', 'stdout'] else args.stats
-    nlp_trf = spacy.load('en_core_web_lg')
+    nlp_trf = spacy.load('en_core_web_trf')
     nlp_sm = spacy.load('en_core_web_sm')
 
 
