@@ -3,5 +3,12 @@ SpaCy Documentation, https://spacy.io/usage/rule-based-matching, Used as a refer
 Hugging Face, https://huggingface.co/docs, Consulted for understanding and using BERT-based NER model for enhanced entity recognition.
 NLTK Documentation, https://www.nltk.org, Referenced for using WordNet to expand concept synonyms.
 Abhiyan Ampally, https://medium.com/@abhiyanampally/ner-location-detection-using-spacy-a-step-by-step-guide-194c7c6a3d7e, Referenced for guidance on location detection using SpaCy NER.
+SpaCy GitHub Issue #276, https://github.com/explosion/spaCy/issues/276, additional insights and solutions related to SpaCy's entity recognition capabilities.
+OpenAI GPT Assistance, https://openai.com, help in identifying and refining redaction methods and also searching for new packages and debugging.
+Spacy Documentation, https://spacy.io/usage/linguistic-features#vectors-similarity, for concept redaction
+NLTK Synonym, https://www.sdhilip.com/synonyms-and-antonyms-in-python/, for concept redaction
+BERT/HuggingFace,https://huggingface.co/dslim/bert-base-NER, for NER redaction
+Presidio, https://pypi.org/project/presidio-anonymizer/, I didn't end up using this but it was helpful and helped me flesh out my ideas better.
+wordnet, https://www.nltk.org/howto/wordnet.html, concept redaction
 
 

@@ -4,8 +4,10 @@ import os
 import tempfile
 
 def test_address_redaction():
+    test_text = "The annual vampire society gathering will be held at Mockingbird Lane, Transylvania."
+    
     with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.txt') as tmp_input:
-        tmp_input.write("The event is located at 1600 Pennsylvania Avenue NW, Washington, D.C.")
+        tmp_input.write(test_text)
         tmp_input_name = tmp_input.name
 
     with tempfile.TemporaryDirectory() as tmp_output_dir:
@@ -20,9 +22,8 @@ def test_address_redaction():
         with open(output_file_path, 'r') as f:
             output_content = f.read()
 
-        assert "1600 Pennsylvania Avenue NW" not in output_content
-        assert "Washington, D.C." not in output_content
-        assert "The event is located at" in output_content
-        assert "████" in output_content
+        assert "Mockingbird Lane" not in output_content
+        assert "Transylvania" not in output_content
+        assert "The annual vampire society gathering will be held at ████████████████, ████████████." in output_content
 
     os.remove(tmp_input_name)
