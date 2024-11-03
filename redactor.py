@@ -13,10 +13,9 @@ from spacy.matcher import Matcher
 from transformers import pipeline
 
 
-nltk.download('punkt', quiet=True)
+nltk.download('punkt_tab', quiet=True)
 nltk.download('wordnet', quiet=True)
 nltk.download('omw-1.4', quiet=True)
-nltk.download('punkt_tab', quiet=True)
 
 def output_stats(stats, stats_type, filename):
     stats_str = f"File: {filename}\n"
@@ -71,30 +70,30 @@ def redact_names(text, nlp, stats):
     redacted_chars = list(text)
     redacted_positions = set()
     stats.setdefault('NAMES', [])
-
+    
     for ent in doc.ents:
         if ent.label_ == 'PERSON':
             stats['NAMES'].append({'text': ent.text, 'start': ent.start_char, 'end': ent.end_char})
             for i in range(ent.start_char, ent.end_char):
                 redacted_chars[i] = "█"
                 redacted_positions.add(i)
-
+    
     def redact_email_names(match):
         username, domain = match.groups()
         stats['NAMES'].append({'text': username, 'start': match.start(1), 'end': match.end(1)})
         return "█" * len(username) + domain
-
+    
     text = re.sub(r'([a-zA-Z0-9._%+-]+)(@[\w.-]+)', redact_email_names, ''.join(redacted_chars))
-
+    
     email_headers = re.findall(r'(From|To):\s*([A-Za-z\s]+)', text)
     for _, name in email_headers:
         for part in name.split():
             text = re.sub(rf'\b{re.escape(part)}\b', lambda m: redact_name_part(m, stats), text)
-
+    
     def redact_name_part(m, stats):
         stats['NAMES'].append({'text': m.group(0), 'start': m.start(), 'end': m.end()})
         return "█" * len(m.group(0))
-
+    
     patterns = {
         r'X-Folder: (.*?)(_Jan|_Feb|_Mar|_Apr|_May|_Jun|_Jul|_Aug|_Sep|_Oct|_Nov|_Dec)\d{4}': "X-Folder: ",
         r'X-Origin: (.*)': "X-Origin: ",
@@ -102,76 +101,76 @@ def redact_names(text, nlp, stats):
         r'/CN=([^/>]+)(?=>)': "/CN=",
         r'</O=ENRON/OU=[^/]+/CN=RECIPIENTS/CN=[^>]+>,\s*([A-Za-z ,]+)(?=(,|$))': ""
     }
-
+    
     for pattern, prefix in patterns.items():
         text = re.sub(pattern, lambda m: redact_generic(m, prefix, stats), text, flags=re.IGNORECASE)
-
+    
     def redact_generic(match, prefix, stats):
         text_to_redact = match.group(1)
         stats.setdefault('NAMES', []).append({'text': text_to_redact, 'start': match.start(1), 'end': match.end(1)})
         redacted = "█" * len(text_to_redact)
         return prefix + redacted
-
+    
     return text
 
 def redact_phone_numbers(text, nlp_sm, matcher, stats):
     doc = nlp_sm(text)
     spans = []
-
+    
     for match_id, start, end in matcher(doc):
         span = doc[start:end]
         spans.append((span.start_char, span.end_char, span.text))
-
+    
     additional_pattern = re.compile(
         r'\b\d{3}\.\d{3}\.\d{4}\b|\b\d{3}\s\d{3}\s\d{4}\b|\(\d{3}\)\s*\d{3}-\d{4}\b|\b\d{10}\b|\b\d{3}-\d{3}-\d{4}\b'
     )
-
+    
     for match in additional_pattern.finditer(text):
         spans.append((match.start(), match.end(), match.group()))
-
+    
     spans = sorted(spans, key=lambda x: x[0])
     merged_spans = []
-
+    
     for span in spans:
         if not merged_spans or span[0] > merged_spans[-1][1]:
             merged_spans.append(span)
         else:
             merged_spans[-1] = (merged_spans[-1][0], max(merged_spans[-1][1], span[1]), merged_spans[-1][2])
-
+    
     redacted_chars = list(text)
     stats.setdefault('PHONE_NUMBERS', [])
-
+    
     for start, end, span_text in merged_spans:
         stats['PHONE_NUMBERS'].append({'text': span_text, 'start': start, 'end': end})
         for i in range(start, end):
             redacted_chars[i] = "█"
-
+    
     return ''.join(redacted_chars)
 
 def redact_addresses(text, nlp, stats):
     doc = nlp(text)
     redacted_chars = list(text)
     stats.setdefault('ADDRESSES', [])
-
+    
     for ent in doc.ents:
         if ent.label_ in ['LOC', 'GPE', 'FAC', 'ADDRESS']:
             stats['ADDRESSES'].append({'text': ent.text, 'start': ent.start_char, 'end': ent.end_char})
             for i in range(ent.start_char, ent.end_char):
                 redacted_chars[i] = "█"
-
+    
     return ''.join(redacted_chars)
 
 def redact_dates(text, nlp, stats):
     doc = nlp(text)
     redacted_chars = list(text)
     stats.setdefault('DATES', [])
-
+    
     for ent in doc.ents:
         if ent.label_ == 'DATE':
             stats['DATES'].append({'text': ent.text, 'start': ent.start_char, 'end': ent.end_char})
             for i in range(ent.start_char, ent.end_char):
                 redacted_chars[i] = "█"
-
+    
     return ''.join(redacted_chars)
 
 def redact_with_huggingface(text, entity_types, ner_pipeline, stats):
@@ -180,7 +179,7 @@ def redact_with_huggingface(text, entity_types, ner_pipeline, stats):
     stats.setdefault('NAMES', [])
     stats.setdefault('ADDRESSES', [])
     stats.setdefault('DATES', [])
-
+    
     for entity in entities:
         if entity['entity_group'] in entity_types:
             start, end = entity['start'], entity['end']
@@ -189,7 +188,7 @@ def redact_with_huggingface(text, entity_types, ner_pipeline, stats):
                 stats[category].append({'text': entity['word'], 'start': start, 'end': end})
                 for i in range(start, end):
                     redacted_chars[i] = "█"
-
+    
     return ''.join(redacted_chars)
 
 def redact_concepts(text, concepts, nlp, stats):
@@ -197,7 +196,7 @@ def redact_concepts(text, concepts, nlp, stats):
     redacted_chars = list(text)
     stats.setdefault('CONCEPTS', [])
     stats.setdefault('CONCEPT_WORDS', [])
-
+    
     similar_words_set = set()
     for concept in concepts:
         synonyms = get_extended_synonyms(concept)
@@ -206,7 +205,7 @@ def redact_concepts(text, concepts, nlp, stats):
             similar_words_set.update(most_similar(syn, nlp))
     
     similar_words_lower = {word.lower() for word in similar_words_set}
-
+    
     for sentence in sentences:
         tokens = [token.lower() for token in word_tokenize(sentence) if token.isalpha()]
         matched_words = [word for word in tokens if word in similar_words_lower]
@@ -223,7 +222,7 @@ def redact_concepts(text, concepts, nlp, stats):
                     absolute_start = sentence_start + word_start
                     absolute_end = absolute_start + len(word)
                     stats['CONCEPT_WORDS'].append({'text': word, 'start': absolute_start, 'end': absolute_end})
-
+    
     return ''.join(redacted_chars)
 
 def main():
@@ -240,17 +239,12 @@ def main():
     args = parser.parse_args()
 
     stats_type = args.stats.lower() if args.stats and args.stats.lower() in ['stderr', 'stdout'] else args.stats
+    nlp_trf = spacy.load('en_core_web_lg')
+    nlp_sm = spacy.load('en_core_web_sm')
 
-    # Load the small model directly
-    try:
-        nlp = spacy.load('en_core_web_sm')
-    except OSError:
-        print("Downloading and installing 'en_core_web_sm' model...")
-        spacy.cli.download('en_core_web_sm')
-        nlp = spacy.load('en_core_web_sm')
 
     if args.phones:
-        matcher = Matcher(nlp.vocab)
+        matcher = Matcher(nlp_sm.vocab)
         phone_patterns = [
             [{"ORTH": "(", "OP": "?"}, {"SHAPE": "ddd"}, {"ORTH": ")", "OP": "?"},
              {"IS_SPACE": True, "OP": "?"}, {"SHAPE": "ddd"}, {"IS_SPACE": True, "OP": "?"},
@@ -277,22 +271,22 @@ def main():
                         text = f.read()
                     
                     if args.names:
-                        text = redact_names(text, nlp, stats)
+                        text = redact_names(text, nlp_trf, stats)
                         text = redact_with_huggingface(text, ['PER'], ner_pipeline, stats)
                     
                     if args.phones:
-                        text = redact_phone_numbers(text, nlp, matcher, stats)
+                        text = redact_phone_numbers(text, nlp_sm, matcher, stats)
                     
                     if args.address:
-                        text = redact_addresses(text, nlp, stats)
+                        text = redact_addresses(text, nlp_trf, stats)
                         text = redact_with_huggingface(text, ['LOC', 'GPE'], ner_pipeline, stats)
                     
                     if args.dates:
-                        text = redact_dates(text, nlp, stats)
+                        text = redact_dates(text, nlp_trf, stats)
                         text = redact_with_huggingface(text, ['DATE'], ner_pipeline, stats)
                     
                     if concepts:
-                        text = redact_concepts(text, concepts, nlp, stats)
+                        text = redact_concepts(text, concepts, nlp_trf, stats)
                     
                     output_path = os.path.join(args.output, os.path.basename(file) + ".censored")
                     with open(output_path, 'w', encoding='utf-8') as out_f:
