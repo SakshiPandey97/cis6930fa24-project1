@@ -1,3 +1,16 @@
+import warnings
+
+warnings.filterwarnings("ignore", category=FutureWarning, module="transformers")
+warnings.filterwarnings("ignore", category=FutureWarning, module="torch")
+warnings.filterwarnings("ignore", category=FutureWarning, module="huggingface_hub")
+from transformers import logging as transformers_logging
+transformers_logging.set_verbosity_error()
+from warnings import filterwarnings
+filterwarnings('ignore')
+
+import logging as python_logging
+python_logging.getLogger("torch").setLevel(python_logging.CRITICAL)
+
 import os
 import sys
 import argparse
@@ -7,11 +20,10 @@ import warnings
 from functools import lru_cache
 import nltk
 from nltk.corpus import wordnet
-from nltk.tokenize import sent_tokenize, word_tokenize
 import spacy
 from spacy.matcher import Matcher
 from transformers import pipeline
-
+import numpy as np
 
 nltk.download('punkt_tab', quiet=True)
 nltk.download('wordnet', quiet=True)
@@ -39,36 +51,34 @@ def get_plural(word):
     else:
         return word + 's'
 
-def get_synonyms(concept):
+@lru_cache(maxsize=None)
+def get_extended_synonyms(concept):
     synonyms = set()
-    for syn in wordnet.synsets(concept):
+    synsets = wordnet.synsets(concept)
+    for syn in synsets:
         for lemma in syn.lemmas():
             synonym = lemma.name().replace('_', ' ').lower()
             synonyms.add(synonym)
             synonyms.add(get_plural(synonym))
+            if lemma.derivationally_related_forms():
+                for related_lemma in lemma.derivationally_related_forms():
+                    related_word = related_lemma.name().replace('_', ' ').lower()
+                    synonyms.add(related_word)
+        for hypernym in syn.hypernyms():
+            for lemma in hypernym.lemmas():
+                hypernym_word = lemma.name().replace('_', ' ').lower()
+                synonyms.add(hypernym_word)
+        for hyponym in syn.hyponyms():
+            for lemma in hyponym.lemmas():
+                hyponym_word = lemma.name().replace('_', ' ').lower()
+                synonyms.add(hyponym_word)
     synonyms.add(concept.lower())
     synonyms.add(get_plural(concept.lower()))
     return synonyms
 
-@lru_cache(maxsize=None)
-def get_extended_synonyms(concept):
-    return get_synonyms(concept)
-
-def most_similar(word, nlp, topn=10):
-    if word not in nlp.vocab or not nlp.vocab[word].has_vector:
-        return []
-    word_obj = nlp.vocab[word]
-    candidates = [
-        w for w in nlp.vocab
-        if w.is_lower == word_obj.is_lower and w.has_vector and w.prob >= -15
-    ]
-    sorted_candidates = sorted(candidates, key=lambda w: word_obj.similarity(w), reverse=True)
-    return [w.text for w in sorted_candidates[:topn]]
-
 def redact_names(text, nlp, stats):
     doc = nlp(text)
     redacted_chars = list(text)
-    redacted_positions = set()
     stats.setdefault('NAMES', [])
     
     for ent in doc.ents:
@@ -76,7 +86,6 @@ def redact_names(text, nlp, stats):
             stats['NAMES'].append({'text': ent.text, 'start': ent.start_char, 'end': ent.end_char})
             for i in range(ent.start_char, ent.end_char):
                 redacted_chars[i] = "█"
-                redacted_positions.add(i)
     
     def redact_email_names(match):
         username, domain = match.groups()
@@ -151,13 +160,32 @@ def redact_addresses(text, nlp, stats):
     doc = nlp(text)
     redacted_chars = list(text)
     stats.setdefault('ADDRESSES', [])
-    
+
+    # Redact addresses identified by spaCy
     for ent in doc.ents:
         if ent.label_ in ['LOC', 'GPE', 'FAC', 'ADDRESS']:
             stats['ADDRESSES'].append({'text': ent.text, 'start': ent.start_char, 'end': ent.end_char})
             for i in range(ent.start_char, ent.end_char):
                 redacted_chars[i] = "█"
-    
+
+    address_patterns = [
+        r'\b\d{1,5}\s\w+(\s\w+){0,4}\b',  
+        r'\b[A-Za-z]+\sRoad\b',  
+        r'\b[A-Za-z]+\sStreet\b',  
+        r'\b[A-Za-z]+\sAvenue\b',  
+        r'\b[A-Za-z]+\sBoulevard\b', 
+        r'\b[A-Za-z]+\sLane\b',  
+        r'\b[A-Za-z]+\sDrive\b',  
+        r'\b\d{5}(?:-\d{4})?\b' 
+    ]
+
+    for pattern in address_patterns:
+        for match in re.finditer(pattern, text, re.IGNORECASE):
+            start, end = match.start(), match.end()
+            stats['ADDRESSES'].append({'text': match.group(), 'start': start, 'end': end})
+            for i in range(start, end):
+                redacted_chars[i] = "█"
+
     return ''.join(redacted_chars)
 
 def redact_dates(text, nlp, stats):
@@ -191,39 +219,58 @@ def redact_with_huggingface(text, entity_types, ner_pipeline, stats):
     
     return ''.join(redacted_chars)
 
+def most_similar(word, nlp, topn=10):
+    with nlp.select_pipes(enable=["transformer"]):
+        word_doc = nlp(word)
+    word_vector = word_doc.vector
+    if word_vector is None or word_vector.size == 0:
+        return []
+    similarities = []
+    wordnet_words = list(wordnet.words())
+    for w in wordnet_words[:10000]:
+        if w.isalpha():
+            with nlp.select_pipes(enable=["transformer"]):
+                w_doc = nlp(w)
+            w_vector = w_doc.vector
+            if w_vector is not None and w_vector.size > 0:
+                sim = np.dot(word_vector, w_vector) / (np.linalg.norm(word_vector) * np.linalg.norm(w_vector))
+                similarities.append((w, sim))
+    similarities = sorted(similarities, key=lambda item: -item[1])
+    return [w for w, sim in similarities[:topn]]
+
 def redact_concepts(text, concepts, nlp, stats):
-    sentences = sent_tokenize(text)
+    doc = nlp(text)
     redacted_chars = list(text)
     stats.setdefault('CONCEPTS', [])
     stats.setdefault('CONCEPT_WORDS', [])
-    
     similar_words_set = set()
     for concept in concepts:
         synonyms = get_extended_synonyms(concept)
         similar_words_set.update(synonyms)
         for syn in synonyms:
             similar_words_set.update(most_similar(syn, nlp))
-    
     similar_words_lower = {word.lower() for word in similar_words_set}
-    
-    for sentence in sentences:
-        tokens = [token.lower() for token in word_tokenize(sentence) if token.isalpha()]
-        matched_words = [word for word in tokens if word in similar_words_lower]
-        if matched_words:
-            sentence_start = text.find(sentence)
-            sentence_end = sentence_start + len(sentence)
+    similar_words_lower.update({concept.lower() for concept in concepts})
+    for sentence in doc.sents:
+        sentence_contains_concept = False
+        for token in sentence:
+            token_text_lower = token.text.lower()
+            if token_text_lower in similar_words_lower:
+                sentence_contains_concept = True
+                start, end = token.idx, token.idx + len(token)
+                stats['CONCEPT_WORDS'].append({'text': token.text, 'start': start, 'end': end})
+                for i in range(start, end):
+                    redacted_chars[i] = "█"
+        if sentence_contains_concept:
+            sentence_start = sentence.start_char
+            sentence_end = sentence.end_char
+            stats['CONCEPTS'].append({'text': sentence.text, 'start': sentence_start, 'end': sentence_end})
             for i in range(sentence_start, sentence_end):
                 if redacted_chars[i] != '\n':
                     redacted_chars[i] = "█"
-            stats['CONCEPTS'].append({'text': sentence, 'start': sentence_start, 'end': sentence_end})
-            for word in matched_words:
-                word_start = sentence.lower().find(word)
-                if word_start != -1:
-                    absolute_start = sentence_start + word_start
-                    absolute_end = absolute_start + len(word)
-                    stats['CONCEPT_WORDS'].append({'text': word, 'start': absolute_start, 'end': absolute_end})
-    
+
     return ''.join(redacted_chars)
+
 
 def main():
     warnings.filterwarnings("ignore", category=FutureWarning, module="thinc.shims.pytorch")
@@ -241,7 +288,6 @@ def main():
     stats_type = args.stats.lower() if args.stats and args.stats.lower() in ['stderr', 'stdout'] else args.stats
     nlp_trf = spacy.load('en_core_web_trf')
     nlp_sm = spacy.load('en_core_web_sm')
-
 
     if args.phones:
         matcher = Matcher(nlp_sm.vocab)
@@ -291,7 +337,6 @@ def main():
                     output_path = os.path.join(args.output, os.path.basename(file) + ".censored")
                     with open(output_path, 'w', encoding='utf-8') as out_f:
                         out_f.write(text)
-                    print(f"Processed and saved: {output_path}")
                     
                     if stats_type:
                         output_stats(stats, stats_type, file)

@@ -25,7 +25,7 @@ Follow these steps to set up The Redactor on your local machine:
    pipenv shell
    ```
 
-3. **Download Necessary NLTK Data**:
+3. **Download Necessary NLTK Data if not installed automatically.**:
 
    Launch a Python interpreter and run:
 
@@ -56,7 +56,7 @@ pipenv run python redactor.py --input [INPUT_FILES] --output [OUTPUT_DIRECTORY] 
 **Example**:
 
 ```bash
-pipenv run python redactor.py --input '*.txt' \
+pipenv run python redactor.py --input 'docs/*.txt' \
     --names --dates --phones --address \
     --concept 'bank' \
     --output 'redacted_output' \
@@ -266,19 +266,11 @@ pipenv run python -m pytest
   - **Issue**: Currently, the focus of this project was for US and UK phone number formats to be effectively redacted. Phone numbers in other international formats may remain unredacted.
 
 - **Incomplete Redaction**:
-  - **Issue**: Complex patterns or unconventional formats/names may not be fully redacted if they don't match predefined patterns or recognized entities.
+  - **Issue**: Complex patterns or unconventional formats may not be fully redacted if they don't match predefined patterns or recognized entities. For example an email address like this: susan@bestbank.com containing the word bank may not be redacted given the concept bank.
 
 ### Assumptions
 
 - **Language**: Input files are plain text in English.
 - **File Format**: Input files are text-based.
 - **Entity Representation**: Relies on the accuracy of underlying NLP models and regex patterns; assumes that most sensitive information adheres to standard representations.
-
-## Acknowledgements
-
-- **SpaCy**: For providing powerful NLP models and tools that facilitate advanced entity recognition.
-- **NLTK**: For the WordNet lexical database, enabling comprehensive concept-based redaction through synonym extraction.
-- **Hugging Face**: For the BERT-based NER model (`dslim/bert-base-NER`), enhancing the tool's ability to identify and redact entities with high accuracy.
-- **Transformers Library**: For the seamless integration of transformer-based models into NLP workflows.
-- **Pytest**: For the robust testing framework that ensures the reliability of The Redactor.
 

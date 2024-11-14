@@ -12,6 +12,8 @@ nltk = "*"
 spacy-transformers = "*"
 pytest = "*"
 torch = "*"
+scikit-learn = "*"
+project1-redactor = {file = ".", editable = true}
 
 [dev-packages]
 
